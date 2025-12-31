@@ -1,0 +1,35 @@
+FROM node:22-alpine AS base
+WORKDIR /app
+RUN npm install -g pnpm
+
+# Copiar archivos de configuración del monorepo
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json nx.json ./
+
+# Copiar dependencias compartidas
+COPY backend/erxes-api-shared ./backend/erxes-api-shared
+
+# Copiar TODOS los plugins
+COPY backend/plugins ./backend/plugins
+
+# Instalar dependencias
+RUN pnpm install --frozen-lockfile
+
+# Build shared
+RUN pnpm --filter erxes-api-shared build || true
+
+# Build todos los plugins
+RUN pnpm --filter "./backend/plugins/*" build || true
+
+# Runtime
+FROM node:22-alpine
+WORKDIR /app
+
+RUN npm install -g pnpm
+
+COPY --from=base /app ./
+
+WORKDIR /app/backend/plugins
+
+EXPOSE 3300
+
+CMD ["pnpm", "start"]
