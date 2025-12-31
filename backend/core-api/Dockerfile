@@ -1,35 +1,30 @@
-# Base image
 FROM node:22-alpine AS base
 WORKDIR /app
 RUN npm install -g pnpm
 
-# Dependencies (production only)
-FROM base AS deps
-# Copy root manifests
+# Copiar archivos de configuración del monorepo
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json nx.json ./
-# Copy only the package.json files for selective deps resolution
-COPY backend/core-api/package.json backend/core-api/
-COPY backend/erxes-api-shared/package.json backend/erxes-api-shared/
 
-# Install only production dependencies
-RUN pnpm install --prod --frozen-lockfile
+# Copiar los packages necesarios
+COPY backend/erxes-api-shared ./backend/erxes-api-shared
+COPY backend/core-api ./backend/core-api
 
-# Runtime image
-FROM base AS runtime
+# Instalar dependencias
+RUN pnpm install --frozen-lockfile
+
+# Build
+RUN pnpm --filter core-api build
+
+# Runtime
+FROM node:22-alpine
 WORKDIR /app
 
-# Copy built dist from CI (nx build already ran in workflow)
-COPY backend/core-api ./backend/core-api
-COPY backend/erxes-api-shared ./backend/erxes-api-shared
+RUN npm install -g pnpm
 
-# Copy production node_modules from deps stage
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/backend/core-api/node_modules ./backend/core-api/node_modules
-COPY --from=deps /app/backend/erxes-api-shared/node_modules ./backend/erxes-api-shared/node_modules
+COPY --from=base /app ./
 
-# Environment & security
-ENV NODE_ENV=production
-USER 1000
+WORKDIR /app/backend/core-api
 
-# Run app
-CMD ["node", "backend/core-api/dist/src/main.js"]
+EXPOSE 3300
+
+CMD ["pnpm", "start"]
