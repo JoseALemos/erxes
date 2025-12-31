@@ -12,7 +12,10 @@ COPY backend/core-api ./backend/core-api
 # Instalar dependencias
 RUN pnpm install --frozen-lockfile
 
-# Build
+# Build erxes-api-shared PRIMERO
+RUN pnpm --filter erxes-api-shared build || true
+
+# Build core-api
 RUN pnpm --filter core-api build
 
 # Runtime
